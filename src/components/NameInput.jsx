@@ -3,56 +3,79 @@ import axios from 'axios';
 import { useServer } from '../context/ServerContext';
 
 const NameInput = ({ results, onSubmitted }) => {
-    const { baseUrl } = useServer();
+    const { serverType } = useServer();
     const [name, setName] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState({ mysql: false, redis: false });
+    const [logs, setLogs] = useState([]);
+
+    // Remove global error state in favor of per-log errors, specifically handled in logs
+    // But we might want a general error if something totally fails outside requests
     const [error, setError] = useState(null);
 
     useEffect(() => {
         const savedName = localStorage.getItem('lastUserName');
         if (savedName) {
-            setName(savedName);
+            // Remove suffix if present to show clean name to user
+            const cleanName = savedName.replace(/-MySQL$/, '').replace(/-Redis$/, '');
+            setName(cleanName);
         }
     }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!name.trim()) return;
+    const handleSubmit = async (server) => {
+        if (!name.trim()) {
+            setError('이름을 입력해주세요.');
+            return;
+        }
 
-        setLoading(true);
         setError(null);
 
-        const average = results.reduce((a, b) => a + b, 0) / results.length;
+        const isMysql = server === 'MySQL';
+        const key = isMysql ? 'mysql' : 'redis';
+        const apiVersion = isMysql ? 'v1' : 'v2';
+
+        // Prevent double submit for same button
+        if (loading[key]) return;
+
+        setLoading(prev => ({ ...prev, [key]: true }));
+
+        const startTime = performance.now();
+        const payload = {
+            attempt1: results[0],
+            attempt2: results[1],
+            attempt3: results[2],
+            name: `${name}-${server}`
+        };
 
         try {
-            localStorage.setItem('lastUserName', name);
+            await axios.post(`/api/${apiVersion}/records`, payload);
+            const duration = (performance.now() - startTime).toFixed(2);
 
-            // Construct payload according to API spec
-            // Assuming API expects attempt1, attempt2, attempt3 in ms or seconds?
-            // The API spec shows "score" in response but input shows attempt1, 2, 3.
-            // Let's assume the API handles the average calculation or expects raw data.
-            // Based on API doc:
-            // {
-            //   "name": "",
-            //   "attempt1": 0,
-            //   "attempt2": 0,
-            //   "attempt3": 0
-            // }
+            // Add to logs
+            setLogs(prev => [
+                ...prev,
+                {
+                    id: Date.now() + Math.random(),
+                    server: server,
+                    status: 'success',
+                    duration: duration
+                }
+            ]);
 
-            const payload = {
-                name: name,
-                attempt1: results[0],
-                attempt2: results[1],
-                attempt3: results[2]
-            };
+            // Save the appropriate name for highlighter based on most recent successful submit
+            localStorage.setItem('lastUserName', `${name}-${server}`);
 
-            await axios.post(`${baseUrl}/records`, payload);
-            onSubmitted();
         } catch (err) {
-            console.error('Failed to submit record:', err);
-            setError('기록 전송에 실패했습니다. 다시 시도해주세요.');
+            setLogs(prev => [
+                ...prev,
+                {
+                    id: Date.now() + Math.random(),
+                    server: server,
+                    status: 'error',
+                    message: err.message
+                }
+            ]);
         } finally {
-            setLoading(false);
+            setLoading(prev => ({ ...prev, [key]: false }));
         }
     };
 
@@ -60,30 +83,107 @@ const NameInput = ({ results, onSubmitted }) => {
         return (results.reduce((a, b) => a + b, 0) / results.length).toFixed(2);
     };
 
+    const handleConfirm = () => {
+        onSubmitted();
+    };
+
     return (
-        <div className='card flex-center'>
+        <div className='card flex-center' style={{ maxWidth: '600px', margin: '0 auto' }}>
             <h2>축하합니다!</h2>
             <p>당신의 평균 반응 속도는 <strong>{calculateAverage()}ms</strong> 입니다.</p>
 
-            <form onSubmit={handleSubmit} style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <label>
-                    랭킹에 등록할 이름을 입력하세요:
+            <div style={{ width: '100%', margin: '1.5rem 0' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', textAlign: 'left' }}>
+                    랭킹에 등록할 이름:
                 </label>
-                <div style={{ display: 'flex' }}>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="이름 (최대 10자)"
-                        maxLength={10}
-                        required
-                    />
-                    <button type="submit" disabled={loading}>
-                        {loading ? '전송 중...' : '등록'}
+                <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="이름 (최대 10자)"
+                    maxLength={10}
+                    style={{ width: '100%', padding: '0.8rem', fontSize: '1rem' }}
+                />
+                {error && <p style={{ color: 'var(--error-color)', marginTop: '0.5rem', fontSize: '0.9rem' }}>{error}</p>}
+            </div>
+
+            {/* Split Cards Container */}
+            <div style={{ display: 'flex', gap: '1rem', width: '100%', marginBottom: '1.5rem' }}>
+                {/* MySQL Card */}
+                <div style={{
+                    flex: 1,
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #444',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '1rem'
+                }}>
+                    <strong style={{ fontSize: '1.2rem' }}>MySQL</strong>
+                    <button
+                        onClick={() => handleSubmit('MySQL')}
+                        disabled={loading.mysql}
+                        style={{ width: '100%', background: '#00758f' }} // Custom MySQL color hint
+                    >
+                        {loading.mysql ? '전송 중...' : 'MySQL 전송'}
                     </button>
                 </div>
-            </form>
-            {error && <p style={{ color: 'var(--error-color)', marginTop: '0.5rem' }}>{error}</p>}
+
+                {/* Redis Card */}
+                <div style={{
+                    flex: 1,
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #444',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '1rem'
+                }}>
+                    <strong style={{ fontSize: '1.2rem' }}>Redis</strong>
+                    <button
+                        onClick={() => handleSubmit('Redis')}
+                        disabled={loading.redis}
+                        style={{ width: '100%', background: '#d82c20' }} // Custom Redis color hint
+                    >
+                        {loading.redis ? '전송 중...' : 'Redis 전송'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Logs Area */}
+            {logs.length > 0 && (
+                <div style={{ width: '100%', marginBottom: '1.5rem', textAlign: 'left' }}>
+                    <h4>전송 결과:</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        {logs.map(log => (
+                            <div key={log.id} style={{
+                                padding: '10px',
+                                backgroundColor: log.status === 'success' ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)',
+                                borderRadius: '5px',
+                                borderLeft: `4px solid ${log.status === 'success' ? '#4caf50' : '#f44336'}`,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: '0.9rem'
+                            }}>
+                                <span><strong>{log.server}</strong></span>
+                                <span>
+                                    {log.status === 'success'
+                                        ? `성공 (${log.duration}ms)`
+                                        : `실패: ${log.message}`}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <button onClick={handleConfirm} style={{ padding: '0.8rem 2rem', fontSize: '1rem', marginTop: '1rem' }}>
+                랭킹 확인하기
+            </button>
         </div>
     );
 };

@@ -28,12 +28,6 @@ const LandingPage = () => {
 
     return (
         <div className="landing-container">
-            <header className="landing-header">
-                <div className="logo-container">
-                    <Code size={32} />
-                    <span className="logo-text">DevPortfolio</span>
-                </div>
-            </header>
 
             <main className="landing-main">
                 <div className="hero-section">

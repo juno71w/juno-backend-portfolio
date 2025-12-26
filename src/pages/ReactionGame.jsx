@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Game from '../components/Game';
 import NameInput from '../components/NameInput';
 import Leaderboard from '../components/Leaderboard';
@@ -7,6 +8,7 @@ import { ServerProvider } from '../context/ServerContext';
 import ServerSelector from '../components/ServerSelector';
 
 function ReactionGame() {
+    const navigate = useNavigate();
     const [screen, setScreen] = useState('home'); // home, game, input, leaderboard
     const [results, setResults] = useState([]);
     const [lastUserName, setLastUserName] = useState(null);
@@ -35,7 +37,9 @@ function ReactionGame() {
         <ServerProvider>
             <div className="reaction-game-container">
                 <ServerSelector />
-                <h1>⚡ 반응 속도 테스트</h1>
+                <div className="game-header">
+                    <h1>⚡ 반응 속도 테스트</h1>
+                </div>
 
                 {screen === 'home' && (
                     <Home onStart={handleStartGame} />

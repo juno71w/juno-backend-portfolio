@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import confetti from 'canvas-confetti';
 import { useServer } from '../context/ServerContext';
 
 const NameInput = ({ results, onSubmitted }) => {
@@ -12,20 +13,33 @@ const NameInput = ({ results, onSubmitted }) => {
     // But we might want a general error if something totally fails outside requests
     const [error, setError] = useState(null);
 
+    const generateRandomName = () => {
+        return `User${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+    };
+
     useEffect(() => {
         const savedName = localStorage.getItem('lastUserName');
         if (savedName) {
             // Remove suffix if present to show clean name to user
             const cleanName = savedName.replace(/-MySQL$/, '').replace(/-Redis$/, '');
             setName(cleanName);
+        } else {
+            setName(generateRandomName());
         }
+
+        // Fire confetti
+        confetti({
+            particleCount: 150,
+            spread: 60,
+            origin: { y: 0.6 }
+        });
     }, []);
 
     const handleSubmit = async (server) => {
-        if (!name.trim()) {
-            setError('이름을 입력해주세요.');
-            return;
-        }
+        // If name is empty or just whitespace, generate one immediately for this submission
+        const currentName = name.trim() || generateRandomName();
+        // Update state if it was empty so UI reflects it momentarily (though we change it again soon)
+        if (!name.trim()) setName(currentName);
 
         setError(null);
 
@@ -43,8 +57,11 @@ const NameInput = ({ results, onSubmitted }) => {
             attempt1: results[0],
             attempt2: results[1],
             attempt3: results[2],
-            name: `${name}-${server}`
+            name: `${currentName}-${server}`
         };
+
+        // Generate new random name for next usage immediately
+        setName(generateRandomName());
 
         try {
             await axios.post(`/api/${apiVersion}/records`, payload);
@@ -52,27 +69,29 @@ const NameInput = ({ results, onSubmitted }) => {
 
             // Add to logs
             setLogs(prev => [
-                ...prev,
                 {
                     id: Date.now() + Math.random(),
                     server: server,
+                    name: `${currentName}-${server}`,
                     status: 'success',
                     duration: duration
-                }
+                },
+                ...prev
             ]);
 
-            // Save the appropriate name for highlighter based on most recent successful submit
-            localStorage.setItem('lastUserName', `${name}-${server}`);
+            // Save the submitted name (not the new random one)
+            localStorage.setItem('lastUserName', `${currentName}-${server}`);
 
         } catch (err) {
             setLogs(prev => [
-                ...prev,
                 {
                     id: Date.now() + Math.random(),
                     server: server,
+                    name: `${currentName}-${server}`,
                     status: 'error',
                     message: err.message
-                }
+                },
+                ...prev
             ]);
         } finally {
             setLoading(prev => ({ ...prev, [key]: false }));
@@ -169,7 +188,10 @@ const NameInput = ({ results, onSubmitted }) => {
                                 justifyContent: 'space-between',
                                 fontSize: '0.9rem'
                             }}>
-                                <span><strong>{log.server}</strong></span>
+                                <div>
+                                    <strong style={{ marginRight: '8px' }}>{log.server}</strong>
+                                    <span style={{ color: '#aaa', fontSize: '0.85rem' }}>{log.name}</span>
+                                </div>
                                 <span>
                                     {log.status === 'success'
                                         ? `성공 (${log.duration}ms)`

@@ -10,8 +10,8 @@ const Game = ({ onComplete }) => {
   const startAttempt = () => {
     setGameState('waiting');
     setMessage('초록색이 되면 클릭하세요!');
-    
-    const randomTime = Math.floor(Math.random() * 3000) + 2000; // 2000ms ~ 5000ms
+
+    const randomTime = Math.floor(Math.random() * 2000) + 1000; // 1000ms ~ 3000ms
 
     timeoutRef.current = setTimeout(() => {
       setGameState('ready');
@@ -32,7 +32,7 @@ const Game = ({ onComplete }) => {
       // Success
       const endTime = Date.now();
       const reactionTime = endTime - startTime;
-      
+
       const newAttempts = [...attempts, reactionTime];
       setAttempts(newAttempts);
       setGameState('idle');
@@ -60,8 +60,8 @@ const Game = ({ onComplete }) => {
   return (
     <div className='flex-center'>
       <h2>반응 속도 테스트 ({attempts.length}/3)</h2>
-      <div 
-        className={getClassName()} 
+      <div
+        className={getClassName()}
         onClick={handleClick}
       >
         {message}

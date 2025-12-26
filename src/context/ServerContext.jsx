@@ -18,7 +18,7 @@ export const ServerProvider = ({ children }) => {
     };
 
     const apiVersion = serverType === 'mysql' ? 'v1' : 'v2';
-    const baseUrl = `http://localhost:8080/api/${apiVersion}`;
+    const baseUrl = `/api/${apiVersion}`;
 
     return (
         <ServerContext.Provider value={{ serverType, setServerType, apiVersion, baseUrl }}>

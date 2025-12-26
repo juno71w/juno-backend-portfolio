@@ -36,7 +36,7 @@ function ReactionGame() {
     return (
         <ServerProvider>
             <div className="reaction-game-container">
-                <ServerSelector />
+                {screen === 'home' && <ServerSelector />}
                 <div className="game-header">
                     <h1>⚡ 반응 속도 테스트</h1>
                 </div>
